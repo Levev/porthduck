@@ -1,0 +1,94 @@
+include "std.porth"
+
+macro BF_SLOT_CAP 255 end
+
+// memory layout
+macro OP_STACK mem end
+macro OP_COUNT mem , end
+macro OP_STACK_END OP_STACK OP_COUNT + end
+macro BF_DATA_PTR OP_STACK_END 1 + end
+macro BF_CELLS BF_DATA_PTR 1 + end 
+macro BF_WHILE_JMP BF_CELLS BF_SLOT_CAP + 1 + end // stores how many op's to jump back if condition is not null
+
+// operations
+macro OP_INC_PTR 1 end // >
+macro OP_DEC_PTR 2 end // <
+macro OP_INC     3 end // +
+macro OP_DEC     5 end // -
+macro OP_OUT     6 end // .
+macro OP_IN      7 end // ,
+macro OP_WHILE   8 end // [
+macro OP_DO      9 end // ]
+
+macro push_op
+    if OP_COUNT BF_SLOT_CAP >= do
+        here eputs ": ERROR: stack overflow\n" eputs 1 exit
+    end
+    OP_STACK_END 1 + swap .
+    OP_STACK OP_COUNT 1 + .
+end
+
+macro parse_bf
+    while dup , 0 != do
+        if dup , '>' = do
+            OP_INC_PTR push_op
+        else if dup , '<' = do
+            OP_DEC_PTR push_op
+        else if dup , '+' = do
+            OP_INC push_op
+        else if dup , '-' = do
+            OP_DEC push_op
+        else if dup , '.' = do
+            OP_OUT push_op
+        else if dup , ',' = do
+            OP_IN push_op
+        else if dup , '[' = do
+            OP_WHILE push_op
+        else if dup , ']' = do
+            OP_DO push_op
+        end end end end end end end end
+        1 +
+    end
+    drop drop
+end
+
+macro sim_bf
+    1
+    while dup OP_COUNT <= do
+        dup OP_STACK + ,
+
+        if dup OP_INC_PTR = do
+            BF_DATA_PTR BF_DATA_PTR , 1 + .
+        else if dup OP_DEC_PTR = do
+            BF_DATA_PTR BF_DATA_PTR , 1 - .
+        else if dup OP_INC = do
+            BF_CELLS BF_DATA_PTR , + dup , 1 + .
+        else if dup OP_DEC = do
+            BF_CELLS BF_DATA_PTR , + dup , 1 - .
+        else if dup OP_OUT = do
+            BF_CELLS BF_DATA_PTR , + , print
+        else if dup OP_IN = do
+            here eputs ": ERROR: OP_IN not implemented\n" eputs
+        else if dup OP_WHILE = do
+            BF_WHILE_JMP 1 + BF_WHILE_JMP , .
+            swap BF_WHILE_JMP over . swap
+        else if dup OP_DO = do
+            if BF_CELLS BF_DATA_PTR , + , 0 != do
+                swap drop BF_WHILE_JMP , swap
+            else
+                BF_WHILE_JMP BF_WHILE_JMP 1 + , .
+            end
+        end end end end end end end end
+        drop
+        1 +
+    end
+    drop
+end
+
+macro main
+    "+[->-[--<]>-]>++.\0"
+    parse_bf
+    sim_bf
+end
+
+main
