@@ -1,0 +1,6 @@
+# files spit out by the porth compiler
+/*.asm
+/*.o
+/main
+# local porth standard lib
+/std

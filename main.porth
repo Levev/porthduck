@@ -1,14 +1,16 @@
 include "std.porth"
 
-macro BF_SLOT_CAP 255 end
+macro BF_SLOT_CAP 1024 30 * end
 
 // memory layout
-macro OP_STACK mem end
-macro OP_COUNT mem , end
-macro OP_STACK_END OP_STACK OP_COUNT + end
-macro BF_DATA_PTR OP_STACK_END 1 + end
-macro BF_CELLS BF_DATA_PTR 1 + end 
-macro BF_WHILE_JMP BF_CELLS BF_SLOT_CAP + 1 + end // stores how many op's to jump back if condition is not null
+macro STDIN_BUF mem end // each time the program encounters a ',' op, this value increases by one
+macro PUTC_BUF STDIN_BUF 8 + end // used to print value of cell as an ascii char
+macro OP_STACK PUTC_BUF 8 + end // pointer to the operation stack
+macro OP_COUNT OP_STACK ,64 end // number of OP's on the OP_STACK
+macro OP_STACK_END OP_STACK 8 + OP_COUNT + end // pointer to last OP
+macro BF_DATA_PTR OP_STACK_END 1 + end // pointer to the data pointer
+macro BF_CELLS BF_DATA_PTR 8 + end // pointer to first cell
+macro BF_WHILE_JMP BF_CELLS BF_SLOT_CAP + 1 + end // stores how many OP's to jump back if condition is not null
 
 // operations
 macro OP_INC_PTR 1 end // >
@@ -20,12 +22,23 @@ macro OP_IN      7 end // ,
 macro OP_WHILE   8 end // [
 macro OP_DO      9 end // ]
 
+// print one character to stdout
+macro putc 
+    if PUTC_BUF , 0 != do
+        "PORTHDUCK ERROR: corrupted stack\n" eputs 1 exit
+    end
+    PUTC_BUF swap .64
+    1 PUTC_BUF puts
+    PUTC_BUF 0 .64
+end
+
+// push one operator to OP_STACK
 macro push_op
     if OP_COUNT BF_SLOT_CAP >= do
-        here eputs ": ERROR: stack overflow\n" eputs 1 exit
+        "PORTHDUCK ERROR: stack overflow.\n" eputs 1 exit
     end
     OP_STACK_END 1 + swap .
-    OP_STACK OP_COUNT 1 + .
+    OP_STACK inc64
 end
 
 macro parse_bf
@@ -55,26 +68,33 @@ end
 macro sim_bf
     1
     while dup OP_COUNT <= do
-        dup OP_STACK + ,
+        dup 8 + OP_STACK + ,
 
         if dup OP_INC_PTR = do
-            BF_DATA_PTR BF_DATA_PTR , 1 + .
+            BF_DATA_PTR inc64
         else if dup OP_DEC_PTR = do
-            BF_DATA_PTR BF_DATA_PTR , 1 - .
+            BF_DATA_PTR dec64
         else if dup OP_INC = do
-            BF_CELLS BF_DATA_PTR , + dup , 1 + .
+            BF_CELLS BF_DATA_PTR ,64 + dup , 1 + .
         else if dup OP_DEC = do
-            BF_CELLS BF_DATA_PTR , + dup , 1 - .
+            BF_CELLS BF_DATA_PTR ,64 + dup , 1 - .
         else if dup OP_OUT = do
-            BF_CELLS BF_DATA_PTR , + , print
+            BF_CELLS BF_DATA_PTR ,64 + , putc
         else if dup OP_IN = do
-            here eputs ": ERROR: OP_IN not implemented\n" eputs
+            if STDIN_BUF ,64 2 nth_argv strlen 1 + >= do
+                "PORTHDUCK INFO: program tried accessing non-existent input\n" puts
+                BF_CELLS BF_DATA_PTR ,64 + 0 .
+            else
+                BF_CELLS BF_DATA_PTR ,64 +
+                2 nth_argv STDIN_BUF ,64 + , .
+            end
+            STDIN_BUF inc64
         else if dup OP_WHILE = do
             BF_WHILE_JMP 1 + BF_WHILE_JMP , .
             swap BF_WHILE_JMP over . swap
         else if dup OP_DO = do
             if BF_CELLS BF_DATA_PTR , + , 0 != do
-                swap drop BF_WHILE_JMP , swap
+                swap drop BF_WHILE_JMP ,64 swap
             else
                 BF_WHILE_JMP BF_WHILE_JMP 1 + , .
             end
@@ -86,8 +106,10 @@ macro sim_bf
 end
 
 macro main
-    "+[->-[--<]>-]>++.\0"
+    1 nth_argv dup strlen swap
+
     parse_bf
+    "PORTHDUCK INFO: finished parsing\n" puts
     sim_bf
 end
 
