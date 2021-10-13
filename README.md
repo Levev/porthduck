@@ -5,7 +5,7 @@ Cells in PorthDuck are one byte long, but we can have *many* cells, which is alw
 ```console
 $ porth sim ./main.porth ',[.,]>++++++++++.' 'Hello, Github!'
 PORTHDUCK INFO: finished parsing
-Hello, World
+Hello, Github!
 ```
 PorthDuck accepts two arguments.\
 The first one is the brainfuck code to be interpreted, the second one is the input buffer from which the code can read.
